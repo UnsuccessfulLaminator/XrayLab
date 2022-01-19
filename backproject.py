@@ -25,6 +25,8 @@ def filter_projection(projection, filter_func = lambda w: np.abs(w)):
 #     backproj_size - pixel width of the backprojected image
 # Returns a 2D array containing the backprojected image.
 def gen_backprojection(projection, ray_xs, angles, backproj_size):
+    print(len(angles), len(ray_xs), projection.shape)
+
     xs = np.linspace(ray_xs.min(), ray_xs.max(), backproj_size)
     backproj = np.zeros((backproj_size,)*2)
     p = interpolate.RectBivariateSpline(angles, ray_xs, projection, kx = 1, ky = 1)
@@ -50,8 +52,14 @@ ray_xs = np.fromiter(map(float, img.text["ray_xs"].split(",")), dtype = np.float
 angles = np.fromiter(map(float, img.text["angles"].split(",")), dtype = np.float64)
 
 proj = np.asarray(img, dtype = np.uint8)
+
+# If the image has multiple color components, average them into one
+if len(proj.shape) == 3: proj = proj[:, :, :3].mean(axis = 2)
+
 proj = filter_projection(proj, lambda w: np.abs(w))
 backproj = gen_backprojection(proj, ray_xs, angles, 256)
 
 plt.imshow(backproj)
 plt.show()
+
+plt.imsave("backproj.png", backproj)
