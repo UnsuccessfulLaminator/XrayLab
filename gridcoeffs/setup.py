@@ -18,6 +18,6 @@ setup(
 )
 
 lib_file = glob(os.sep.join(["build", "lib*", "gridcoeffs*"]))[0]
-dest = "."+lib_file[lib_file.rfind(os.sep):]
+dest = ".."+lib_file[lib_file.rfind(os.sep):]
 
 os.rename(lib_file, dest)
