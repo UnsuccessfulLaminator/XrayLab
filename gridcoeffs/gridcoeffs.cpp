@@ -7,7 +7,7 @@
 
 
 
-PyObject *Py_grid_coeffs(PyObject *self, PyObject *args);
+static PyObject *Py_grid_coeffs(PyObject *self, PyObject *args);
 
 // Defines all the methods that will be in the module
 static PyMethodDef gridcoeffsMethods[] = {
@@ -61,7 +61,7 @@ void gridCoeffs(
 
                 for(int j = j0; j <= j0+2; j++) {
                     if(j >= 0 && j < ny) {
-                        coeffs[nx*ny*rayIdx + nx*j + i] = ray.lengthInsideBounds(
+                        coeffs[nx*ny*rayIdx + nx*j + i] += ray.lengthInsideBounds(
                             Point{x-step/2, ySnap-step/2}, Point{x+step/2, ySnap+step/2}
                         );
                     }
@@ -83,7 +83,7 @@ void gridCoeffs(
 
                 for(int i = i0; i <= i0+2; i++) {
                     if(i >= 0 && i < nx) {
-                        coeffs[nx*ny*rayIdx + nx*j + i] = ray.lengthInsideBounds(
+                        coeffs[nx*ny*rayIdx + nx*j + i] += ray.lengthInsideBounds(
                             Point{xSnap-step/2, y-step/2}, Point{xSnap+step/2, y+step/2}
                         );
                     }
@@ -101,16 +101,18 @@ void gridCoeffs(
 }
 
 // Python+numpy wrapper around the function above.
-PyObject *Py_grid_coeffs(PyObject *self, PyObject *args) {
+static PyObject *Py_grid_coeffs(PyObject *self, PyObject *args) {
     double step;
     Point p0;
     unsigned int nx, ny;
     PyObject *pyRays_;
+    PyArrayObject *out = nullptr;
     
-    // Parse the input arguments. Refcount of pyRays_ is not incremented.
-    if(!PyArg_ParseTuple(args, "dddkkO", &step, &p0.x, &p0.y, &nx, &ny, &pyRays_)) {
-        return nullptr;
-    }
+    // Parse the input arguments. This doesn't increment any refcounts
+    if(!PyArg_ParseTuple(
+        args, "dddkkO|O!",
+        &step, &p0.x, &p0.y, &nx, &ny, &pyRays_, &PyArray_Type, &out
+    )) return nullptr;
     
     // Convert the rays argument into a C-contiguous numpy array of doubles, if needed
     if(!(pyRays_ = PyArray_FROM_OTF(pyRays_, PyArray_DOUBLE, NPY_ARRAY_CARRAY_RO))) {
@@ -123,21 +125,39 @@ PyObject *Py_grid_coeffs(PyObject *self, PyObject *args) {
     // Check the array of rays actually has the right shape, and complain if it doesn't.
     if(pyRays->nd != 2 || pyRays->dimensions[1] != 2) {
         PyErr_SetString(PyExc_ValueError, "rays must have shape (*, 2)");
+        Py_DECREF(pyRays_);
+
         return nullptr;
     }
 
     npy_intp n = pyRays->dimensions[0];
-    Line *rayBegin = (Line*) pyRays->data;
-    double *coeffs = (double*) PyMem_Malloc(n*nx*ny*sizeof(double));
     
-    // Calculate, and drop the ref to the array we just made now that we're done with it.
-    gridCoeffs(coeffs, step, p0, nx, ny, rayBegin, rayBegin+n);
-    Py_DECREF(pyRays_);
-    
-    // Make a new numpy array wrapping the raw double array.
-    npy_intp dims[] = {n, nx*ny};
-    PyObject *out = PyArray_SimpleNewFromData(2, dims, PyArray_DOUBLE, coeffs);
-    ((PyArrayObject*) out)->flags |= NPY_ARRAY_OWNDATA;
+    // If a destination array wasn't given, make a new one full of zeros. Otherwise, make
+    // sure the array given has the right shape.
+    if(!out) {
+        npy_intp dims[] = {n, nx*ny};
+        out = (PyArrayObject*) PyArray_ZEROS(2, dims, PyArray_DOUBLE, 0);
+    }
+    else if(out->nd != 2 || out->dimensions[0] != n || out->dimensions[1] != nx*ny) {
+        PyErr_SetString(PyExc_ValueError, "out must have shape (rays.size, nx*ny)");
+        Py_DECREF(pyRays_);
 
-    return out;
+        return nullptr;
+    }
+    else if(out->descr->type_num != PyArray_FLOAT64) {
+        PyErr_SetString(PyExc_ValueError, "out must have dtype float64");
+        Py_DECREF(pyRays_);
+
+        return nullptr;
+    }
+    
+    // Calculate
+    double *coeffs = (double*) ((PyArrayObject*) out)->data;
+    Line *rayBegin = (Line*) pyRays->data;
+    gridCoeffs(coeffs, step, p0, nx, ny, rayBegin, rayBegin+n);
+    
+    Py_DECREF(pyRays_);
+    Py_INCREF(out);
+
+    return (PyObject*) out;
 }

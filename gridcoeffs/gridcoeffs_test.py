@@ -29,11 +29,11 @@ img = img[:, :, 0]
 img.shape = (img.size,)
 
 proj = np.empty((n_angles, len(rays)))
+coeffs = np.empty((len(rays), nx*ny))
 
 for i, angle in enumerate(angles):
-    coeffs = grid_coeffs(step, *p0, nx, ny, rays)
-    coeffs.shape = (len(rays), nx*ny)
-
+    coeffs.fill(0)
+    grid_coeffs(step, *p0, nx, ny, rays, coeffs)
     proj[i] = np.matmul(coeffs, img)
 
     for j, ray in enumerate(rays): rays[j] = rotate_line(*ray, 0, 0, np.pi/n_angles)
