@@ -150,6 +150,12 @@ static PyObject *Py_grid_coeffs(PyObject *self, PyObject *args) {
 
         return nullptr;
     }
+    else if(!PyArray_ISCARRAY_RO(out)) {
+        PyErr_SetString(PyExc_ValueError, "out has wrong internal format (not C-array)");
+        Py_DECREF(pyRays_);
+
+        return nullptr;
+    }
     
     // Calculate
     double *coeffs = (double*) ((PyArrayObject*) out)->data;
