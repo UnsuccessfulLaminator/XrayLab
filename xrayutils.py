@@ -2,6 +2,7 @@ from shapely.geometry import Point, LineString
 from shapely import affinity
 import numpy as np
 from scipy import interpolate, fft
+import gridcoeffs
 
 
 
@@ -26,7 +27,7 @@ def find_ray_integral(ray, poly, density):
 #     center  - center around which to rotate
 # Returns a 2D array of projections, where each row corresponds to an angle, each column to
 # a ray.
-def gen_projections(objects, ray_xs, y_range, angles, center):
+def project_objects(objects, ray_xs, y_range, angles, center):
     projection = np.zeros((len(angles), len(ray_xs)), dtype = np.float64)
     rays = [ LineString(((x, y_range[0]), (x, y_range[1]))) for x in ray_xs ]
 
@@ -39,6 +40,51 @@ def gen_projections(objects, ray_xs, y_range, angles, center):
 
     return projection
 
+
+# Translate a line, given by the length r and angle t of the perpendicular line segment
+# joining it to the origin. Parameters:
+#     r, t   - Input line
+#     dx, dy - Translation amount in x and y
+# Returns r, t of the translated line.
+def _translate_line(r, t, dx, dy):
+    return r+np.cos(t)*dx+np.sin(t)*dy, t
+
+
+# Rotate a line of the same form as described above. Parameters:
+#     r, t   - Input line
+#     cx, cy - Center of rotation
+#     angle  - Angle of rotation
+# Returns r, t of the rotated line.
+def _rotate_line(r, t, cx, cy, angle):
+    r, t = _translate_line(r, t, -cx, -cy)
+    t = (t+angle)%(np.pi*2)
+    
+    return _translate_line(r, t, cx, cy)
+
+
+# Parameters:
+#     img     - 2D array containing pixel data, where each value is effectively a density
+#     ray_xs  - x coordinates of the initially vertical rays to project through
+#     y_range - Range of ys to extend the rays over
+#     center  - Center of rotation
+# Returns a 2D array of projections, where each row corresponds to an angle, each column to
+# a ray.
+def project_image(img, ray_xs, y_range, angles, center):
+    proj = np.zeros((len(angles), len(ray_xs)))
+    coeffs = np.zeros((len(ray_xs), img.size))
+    p0 = (0.5-img.shape[1]/2, 0.5-img.shape[0]/2)
+    rays = [ (x, 0) for x in ray_xs ]
+
+    for i, angle in enumerate(angles):
+        rays_rotated = [ _rotate_line(*ray, *center, angle) for ray in rays ]
+
+        coeffs.fill(0)
+        gridcoeffs.grid_coeffs(1, *p0, *img.T.shape, rays_rotated, coeffs)
+        proj[i] = np.matmul(coeffs, img.ravel())
+    
+    del coeffs
+    return proj
+    
 
 # Parameters:
 #     objects - list of (object, density) where object is a Polygon and density is a number
@@ -76,7 +122,7 @@ def filter_projection(projection, filter_func = lambda w: np.abs(w)):
 #     angles        - angles at which projections were taken
 #     backproj_size - pixel width of the backprojected image
 # Returns a 2D array containing the backprojected image.
-def gen_backprojection(projection, ray_xs, angles, backproj_size):
+def backproject(projection, ray_xs, angles, backproj_size):
     print(len(angles), len(ray_xs), projection.shape)
 
     xs = np.linspace(ray_xs.min(), ray_xs.max(), backproj_size)

@@ -38,7 +38,7 @@ plt.imsave("scene.png", render)
 
 ray_xs = np.linspace(*x_range, n_rays)
 angles = np.linspace(0, np.pi, n_angles, endpoint = False)
-projection = xrayutils.gen_projections(objects, ray_xs, y_range, angles, stage_center)
+projection = xrayutils.project_objects(objects, ray_xs, y_range, angles, stage_center)
 
 plt.subplot(1, 2, 2)
 plt.imshow(projection, cmap = "gray")

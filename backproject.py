@@ -20,7 +20,7 @@ proj = np.asarray(img, dtype = np.uint8)
 if len(proj.shape) == 3: proj = proj[:, :, :3].mean(axis = 2)
 
 proj = xrayutils.filter_projection(proj, lambda w: np.abs(w))
-backproj = xrayutils.gen_backprojection(proj, ray_xs, angles, 256)
+backproj = xrayutils.backproject(proj, ray_xs, angles, 256)
 
 plt.imshow(backproj)
 plt.show()
