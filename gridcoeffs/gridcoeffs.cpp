@@ -2,6 +2,9 @@
 #include <Python.h>
 #include "numpy/arrayobject.h"
 
+#include <iostream>
+#include <vector>
+#include <thread>
 #include "point.hpp"
 #include "line.hpp"
 
@@ -56,10 +59,10 @@ void gridCoeffs(
             double y = ray.getY(p0.x), dy = m*step;
 
             for(int i = 0; i < nx; i++) {
-                int j0 = round((y-p0.y)/step)-1;
+                int j0 = floor((y-p0.y)/step);
                 double ySnap = p0.y+step*j0;
 
-                for(int j = j0; j <= j0+2; j++) {
+                for(int j = j0; j <= j0+1; j++) {
                     if(j >= 0 && j < ny) {
                         coeffs[nx*ny*rayIdx + nx*j + i] += ray.lengthInsideBounds(
                             Point{x-step/2, ySnap-step/2}, Point{x+step/2, ySnap+step/2}
@@ -78,10 +81,10 @@ void gridCoeffs(
             double y = p0.y;
 
             for(int j = 0; j < ny; j++) {
-                int i0 = round((x-p0.x)/step)-1;
+                int i0 = floor((x-p0.x)/step);
                 double xSnap = p0.x+step*i0;
 
-                for(int i = i0; i <= i0+2; i++) {
+                for(int i = i0; i <= i0+1; i++) {
                     if(i >= 0 && i < nx) {
                         coeffs[nx*ny*rayIdx + nx*j + i] += ray.lengthInsideBounds(
                             Point{xSnap-step/2, y-step/2}, Point{xSnap+step/2, y+step/2}
@@ -98,6 +101,30 @@ void gridCoeffs(
 
         rayIdx++;
     }
+}
+
+template<typename InputIt, typename OutputIt>
+void gridCoeffsThreaded(
+    OutputIt coeffs,
+    double step, const Point &p0, int nx, int ny, InputIt rayBegin, InputIt rayEnd
+) {
+    const unsigned int nThreads = 8;
+    unsigned int nRays = std::distance(rayBegin, rayEnd);
+    unsigned int offset0 = 0;
+    std::vector<std::thread> threads;
+
+    for(unsigned int i = 1; i <= nThreads; i++) {
+        unsigned int offset1 = (nRays*i)/nThreads;
+
+        threads.emplace_back(
+            gridCoeffs<InputIt, OutputIt>,
+            coeffs+offset0*nx*ny, step, p0, nx, ny, rayBegin+offset0, rayBegin+offset1
+        );
+
+        offset0 = offset1;
+    }
+
+    for(std::thread &t : threads) t.join();
 }
 
 // Python+numpy wrapper around the function above.
@@ -160,7 +187,7 @@ static PyObject *Py_grid_coeffs(PyObject *self, PyObject *args) {
     // Calculate
     double *coeffs = (double*) ((PyArrayObject*) out)->data;
     Line *rayBegin = (Line*) pyRays->data;
-    gridCoeffs(coeffs, step, p0, nx, ny, rayBegin, rayBegin+n);
+    gridCoeffsThreaded(coeffs, step, p0, nx, ny, rayBegin, rayBegin+n);
     
     Py_DECREF(pyRays_);
     Py_INCREF(out);
