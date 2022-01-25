@@ -42,6 +42,9 @@ projection = xrayutils.project_objects(objects, ray_xs, y_range, angles, stage_c
 
 plt.subplot(1, 2, 2)
 plt.imshow(projection, cmap = "gray")
+plt.title("Projection")
+plt.xlabel("Ray index")
+plt.ylabel("Angle index")
 plt.show()
 
 projection -= projection.min()
