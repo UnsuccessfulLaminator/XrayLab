@@ -123,8 +123,6 @@ def filter_projection(projection, filter_func = lambda w: np.abs(w)):
 #     backproj_size - pixel width of the backprojected image
 # Returns a 2D array containing the backprojected image.
 def backproject(projection, ray_xs, angles, backproj_size):
-    print(len(angles), len(ray_xs), projection.shape)
-
     xs = np.linspace(ray_xs.min(), ray_xs.max(), backproj_size)
     backproj = np.zeros((backproj_size,)*2)
     p = interpolate.RectBivariateSpline(angles, ray_xs, projection, kx = 1, ky = 1)
