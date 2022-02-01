@@ -3,6 +3,7 @@ from shapely import affinity
 import numpy as np
 from scipy import interpolate, fft
 import gridcoeffs
+from interp2d import Interp2D
 
 
 
@@ -125,8 +126,13 @@ def filter_projection(projection, filter_func = lambda w: np.abs(w)):
 def backproject(projection, ray_xs, angles, backproj_size):
     xs = np.linspace(ray_xs.min(), ray_xs.max(), backproj_size)
     backproj = np.zeros((backproj_size,)*2)
-    p = interpolate.RectBivariateSpline(angles, ray_xs, projection, kx = 1, ky = 1)
     ss = np.empty_like(backproj)
+    ts = np.empty_like(backproj)
+
+    ds = ray_xs.ptp()/(ray_xs.size-1)
+    dt = angles.ptp()/(angles.size-1)
+    p = Interp2D()
+    p.set_data(ds, dt, projection)
 
     for angle in angles:
         cos = np.cos(angle)
@@ -134,6 +140,6 @@ def backproject(projection, ray_xs, angles, backproj_size):
         ss[:] = xs*cos
         ss.T[:] += xs*sin
 
-        backproj += p(angle, ss, grid = False)
+        backproj += p(ss, np.full_like(ss, angle))
     
     return backproj
