@@ -45,13 +45,20 @@ def filter_func(w):
 for i, in_file, out_file in zip(count(), proj_files, out_files):
     img = Image.open(in_file)
     proj = np.asarray(img.convert("I")).astype(np.float64)
-    proj = xrayutils.filter_projection(proj, filter_func)
-    backproj = xrayutils.backproject(proj, ray_xs, angles, 256)
+    proj_filtered = xrayutils.filter_projection(proj, filter_func)
+    backproj = xrayutils.backproject(proj_filtered, ray_xs, angles, 256)
     
     if args.plot:
+        plt.subplot(1, 3, 1)
+        plt.imshow(proj, vmin = 0, cmap = "gray")
+        plt.subplot(1, 3, 2)
+        plt.imshow(proj_filtered, cmap = "gray")
+        plt.subplot(1, 3, 3)
         plt.imshow(backproj, vmin = args.t0, vmax = args.t1, cmap = "gray")
         plt.show()
 
     plt.imsave(out_file, backproj, vmin = args.t0, vmax = args.t1, cmap = "gray")
 
-    print(f"{i+1}/{len(proj_files)} files completed")
+    print(f"\r{i+1}/{len(proj_files)} files completed", end = "")
+
+print()
