@@ -16,11 +16,13 @@ parser.add_argument("-b", "--bias-img", help = "Image to subtract off each 2D pr
 parser.add_argument("-d", "--dead-map", help = "Image file with dead pixels as non-zero")
 parser.add_argument("-t", "--translate", type = float, help = "Apply horizontal translation to outputs")
 parser.add_argument("-dt", type = float)
+parser.add_argument("-dtype", help = "Numpy string dtype of the mpx data", default = "u2")
+parser.add_argument("-g", "--gaussian", type = float, default = 0, help = "Gaussian blur")
 parser.add_argument("out_base_name", help = "Base name of output projection files")
 
 args = parser.parse_args()
 start, num = args.start, args.number
-imgs = mpxread.load_mpx_imgs(args.mpx_file)
+imgs = mpxread.load_mpx_imgs(args.mpx_file, dtype = args.dtype)
 n_angles, n_rays, n_slices = imgs.shape
 
 if args.dead_map:
@@ -29,6 +31,10 @@ if args.dead_map:
     
     for i, img in enumerate(imgs):
         imgs[i] = cv2.inpaint(img, dead, inpaintRadius = 3, flags = cv2.INPAINT_TELEA)
+
+if args.gaussian > 0:
+    for img in imgs:
+        ndimage.gaussian_filter(img, args.gaussian, output = img)
 
 imgs = imgs.astype(np.int16)
 
