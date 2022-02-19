@@ -2,8 +2,9 @@ import numpy as np
 
 
 
-def load_mpx_imgs(f, width = 256, height = 256, dtype = "u2", n = None):
+def load(f, width = 256, height = 256, dtype = "<u2", n = None):
     if not hasattr(f, "read"): f = open(f, "rb")
+    elif f.mode != "rb": raise ValueError("File handle must be opened for binary read.")
 
     itemsize = np.dtype(dtype).itemsize
 
